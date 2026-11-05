@@ -107,9 +107,9 @@ MIT
 
 | 文件 | 大小 | SHA-256 |
 | --- | --- | --- |
-| `dsh-pindou-pattern-0.1.0.tgz` | 934,848 B | `23a6a9fc79095596c9aadf3afc607b439bd5795fc9d517fcf83920f516090f11` |
-| `BeadPatternStudio.exe` | 918,528 B | `94ffadea826854d93a4261f3d61cd850c2b510a48351d7ae6f4f87b5b4f5b4ed` |
-| `pindou-web.zip` | 25,252 B | `74f179b43f5e247228031dc35c477b06d20b22d5b29f02e6311ec2722a048bf9` |
+| `dsh-pindou-pattern-0.1.0.tgz` | 937,222 B | `e309b91df74f366b099f9516dd97310d74ad8213d0d58ffcd061feff82a025ea` |
+| `BeadPatternStudio.exe` | 921,088 B | `5eb3b759e3ee7565f7e40f06eb46f060ef008c751430f38100e12b367b080402` |
+| `pindou-web.zip` | 25,825 B | `7c8067bbf74c09a4d9f50a38f02daef090f367c8c16092a495289c002091e4c2` |
 
 - **.tgz** 是 npm 包（`package.json`、`index.js`、`client.js`、`cordis.patch.yml`、`icon.svg`、`locale/`、`src/`、`web/`、`win/`、`docs/`、README、LICENSE）。
   - 直接发布：`npm publish dist/dsh-pindou-pattern-0.1.0.tgz`

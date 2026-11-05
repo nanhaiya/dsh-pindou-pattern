@@ -395,9 +395,30 @@ function buildPattern(rgba, w, h, opts) {
 
 /** Sample the source image down to the grid and read its pixels. */
 function sampleGrid(source, w, h, createCanvas) {
+  const srcW = source.width;
+  const srcH = source.height;
+  const targetAspect = w / h;
+  const srcAspect = srcW / srcH;
+  let sx = 0;
+  let sy = 0;
+  let sw = srcW;
+  let sh = srcH;
+  // 目标网格与图片比例不一致时居中裁切，绝不拉伸变形
+  if (srcAspect > targetAspect) {
+    sw = Math.max(1, Math.round(srcH * targetAspect));
+    sx = Math.round((srcW - sw) / 2);
+  } else if (srcAspect < targetAspect) {
+    sh = Math.max(1, Math.round(srcW / targetAspect));
+    sy = Math.round((srcH - sh) / 2);
+  }
   let canvas = source;
-  let sw = canvas.width;
-  let sh = canvas.height;
+  if (sx !== 0 || sy !== 0 || sw !== srcW || sh !== srcH) {
+    canvas = createCanvas(sw, sh);
+    const crop = canvas.getContext('2d', { willReadFrequently: true });
+    crop.imageSmoothingEnabled = true;
+    crop.imageSmoothingQuality = 'high';
+    crop.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
+  }
   while (sw > w * 2 && sh > h * 2) {
     const nw = Math.max(w, Math.round(sw / 2));
     const nh = Math.max(h, Math.round(sh / 2));

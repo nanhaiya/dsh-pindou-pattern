@@ -67,6 +67,7 @@ function normalizeSettings(raw) {
     removeBg: raw.removeBg === true,
     tolerance: num(raw.tolerance, 12, 0, 60),
     showCodes: raw.showCodes !== false,
+    lockRatio: raw.lockRatio !== false,
   };
 }
 
@@ -154,7 +155,33 @@ function createStore() {
     }, 80);
   }
 
+  function fitSize(width, nextSource) {
+    const source = nextSource || state.source;
+    if (!source) return null;
+    const ratio = source.height / source.width;
+    let w = clamp(Math.round(width), 8, 200);
+    let h = clamp(Math.round(w * ratio), 8, 200);
+    if (h > 200) {
+      h = 200;
+      w = clamp(Math.round(h / ratio), 8, 200);
+    }
+    return { w, h };
+  }
+
   function setSettings(partial) {
+    const source = state.source;
+    const locked = state.settings.lockRatio !== false && source;
+    if (locked && (partial.w !== undefined || partial.h !== undefined)) {
+      const ratio = source.height / source.width;
+      if (partial.w !== undefined && partial.h === undefined) {
+        const w = clamp(Math.round(Number(partial.w)), 8, 200);
+        const h = clamp(Math.round(w * ratio), 8, 200);
+        partial = Object.assign({}, partial, h > 200 ? { w: clamp(Math.round(200 / ratio), 8, 200), h: 200 } : { h });
+      } else if (partial.h !== undefined && partial.w === undefined) {
+        const h = clamp(Math.round(Number(partial.h)), 8, 200);
+        partial = Object.assign({}, partial, { w: clamp(Math.round(h / ratio), 8, 200) });
+      }
+    }
     const next = normalizeSettings(Object.assign({}, state.settings, partial));
     const changed = JSON.stringify(next) !== JSON.stringify(state.settings);
     if (!changed) return;
@@ -467,11 +494,17 @@ function Page({ ctx, store }) {
         const current = store.getSnapshot().settings;
         let next = current;
         const ratio = source.height / source.width;
-        if (Math.abs(ratio - 1) > 0.12 && current.w === current.h) {
-          next = Object.assign({}, current, { h: clamp(Math.round(current.w * ratio), 8, 200) });
+        let width = current.w;
+        let height = clamp(Math.round(width * ratio), 8, 200);
+        if (height > 200) {
+          height = 200;
+          width = clamp(Math.round(height / ratio), 8, 200);
         }
+        next = Object.assign({}, current, { w: width, h: height });
         store.setSource(source, next);
-        if (next !== current) store.toast(t('size.adjusted', { w: next.w, h: next.h }));
+        if (next.w !== current.w || next.h !== current.h) {
+          store.toast(t('size.adjusted', { w: next.w, h: next.h }));
+        }
       } catch (error) {
         console.warn('[pindou-pattern] image load failed', error);
         store.toast(t('error.load'));
@@ -819,9 +852,22 @@ function Page({ ctx, store }) {
                   key: size,
                   type: 'button',
                   className: 'pdp-chip',
-                  'data-active': String(snap.settings.w === size && snap.settings.h === size),
+                  'data-active': String(
+                    snap.settings.lockRatio !== false && snap.source
+                      ? snap.settings.w === size
+                      : snap.settings.w === size && snap.settings.h === size,
+                  ),
                   'aria-pressed': snap.settings.w === size && snap.settings.h === size,
-                  onClick: () => store.setSettings({ w: size, h: size }),
+                  onClick: () =>
+                    store.setSettings(
+                      snap.settings.lockRatio !== false && snap.source
+                        ? (() => {
+                            const ratio = snap.source.height / snap.source.width;
+                            const h = clamp(Math.round(size * ratio), 8, 200);
+                            return h > 200 ? { w: clamp(Math.round(200 / ratio), 8, 200), h: 200 } : { w: size, h };
+                          })()
+                        : { w: size, h: size },
+                    ),
                 },
                 size + '×' + size,
               ),
@@ -857,10 +903,19 @@ function Page({ ctx, store }) {
             ),
           ),
           React.createElement(
-            'button',
-            { type: 'button', className: 'pdp-linkbtn', onClick: fitRatio, disabled: !snap.source },
-            React.createElement(IconRatio, { size: 13 }),
-            t('size.fit'),
+            'div',
+            { className: 'pdp-ratio-row' },
+            React.createElement(Toggle, {
+              checked: snap.settings.lockRatio !== false,
+              onChange: (value) => store.setSettings({ lockRatio: value }),
+              label: t('size.lock'),
+            }),
+            React.createElement(
+              'button',
+              { type: 'button', className: 'pdp-linkbtn', onClick: fitRatio, disabled: !snap.source },
+              React.createElement(IconRatio, { size: 13 }),
+              t('size.fit'),
+            ),
           ),
           React.createElement('p', { className: 'pdp-note' }, t('size.note')),
         ),

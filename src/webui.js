@@ -15,6 +15,7 @@ const WEB_DEFAULTS = {
   removeBg: false,
   tolerance: 12,
   showCodes: true,
+  lockRatio: true,
 };
 
 const WEB_CSS = `
@@ -77,6 +78,9 @@ h1,h2,h3,p{margin:0}
 .thumb .meta{min-width:0;font-size:12px;color:var(--ink-soft);line-height:1.45}
 .thumb .meta b{display:block;color:var(--ink);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
 .demo-row{margin-top:10px}
+.ratio-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px}
+.ratio-row .lock{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-soft);cursor:pointer}
+.ratio-row .lock input{accent-color:var(--accent);width:13px;height:13px;margin:0;cursor:pointer}
 .presets{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
 .preset{border:1px solid var(--line-strong);background:var(--card);border-radius:9px;padding:7px 0;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--ink-soft)}
 .preset.on{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft)}
@@ -255,7 +259,8 @@ function webTemplate() {
             '<div class="presets" id="presets"></div>' +
             '<div class="row"><label><span data-i18n="size.width">宽</span><input id="wInput" type="number" min="8" max="200" step="1" value="50"></label>' +
             '<span class="x">×</span><label><span data-i18n="size.height">高</span><input id="hInput" type="number" min="8" max="200" step="1" value="50"></label></div>' +
-            '<div style="margin-top:9px"><button class="link" id="fitBtn" type="button" data-i18n="size.fit">按原图比例</button></div>' +
+            '<div class="ratio-row"><label class="lock"><input type="checkbox" id="lockRatio" checked><span data-i18n="size.lock">锁定原图比例</span></label>' +
+            '<button class="link" id="fitBtn" type="button" data-i18n="size.fit">按原图比例</button></div>' +
             '<p class="hint" data-i18n="size.note">8–200 格 · 每格一颗豆</p>' +
           '</section>' +
           '<section class="card">' +
@@ -349,7 +354,14 @@ function webWire() {
     button.className = 'preset';
     button.textContent = size + '×' + size;
     button.dataset.size = String(size);
-    button.addEventListener('click', () => webApplySize(size, size));
+    button.addEventListener('click', () => {
+      if (webState.settings.lockRatio !== false && webState.source) {
+        const ratio = webState.source.height / webState.source.width;
+        webApplySize(size, clamp(Math.round(size * ratio), 8, 200));
+      } else {
+        webApplySize(size, size);
+      }
+    });
     webViews.presets.appendChild(button);
   }
 
@@ -391,6 +403,10 @@ function webWire() {
   webViews.wInput.addEventListener('change', () => webSizeFromInput());
   webViews.hInput.addEventListener('change', () => webSizeFromInput());
   webViews.fitBtn.addEventListener('click', () => webFitToImage(true));
+  webViews.lockRatio = webEl('lockRatio');
+  webViews.lockRatio.addEventListener('change', () => {
+    webPatch({ lockRatio: webViews.lockRatio.checked });
+  });
 
   webViews.scopeSeg.addEventListener('click', (event) => {
     const button = event.target.closest('button[data-scope]');
@@ -512,8 +528,23 @@ function webApplySize(w, h) {
 }
 
 function webSizeFromInput() {
-  webState.settings.w = clamp(Math.round(Number(webViews.wInput.value) || 50), 8, 200);
-  webState.settings.h = clamp(Math.round(Number(webViews.hInput.value) || 50), 8, 200);
+  const locked = webState.settings.lockRatio !== false && !!webState.source;
+  const source = webState.source;
+  const ratio = source ? source.height / source.width : 1;
+  if (locked) {
+    const changedW = document.activeElement === webViews.wInput;
+    if (changedW) {
+      webState.settings.w = clamp(Math.round(Number(webViews.wInput.value) || 50), 8, 200);
+      const h = clamp(Math.round(webState.settings.w * ratio), 8, 200);
+      webState.settings.h = h > 200 ? 200 : h;
+    } else {
+      webState.settings.h = clamp(Math.round(Number(webViews.hInput.value) || 50), 8, 200);
+      webState.settings.w = clamp(Math.round(webState.settings.h / ratio), 8, 200);
+    }
+  } else {
+    webState.settings.w = clamp(Math.round(Number(webViews.wInput.value) || 50), 8, 200);
+    webState.settings.h = clamp(Math.round(Number(webViews.hInput.value) || 50), 8, 200);
+  }
   webSaveSettings();
   webRenderControls();
   webSchedule(90);
@@ -559,6 +590,7 @@ function webRender() {
 function webRenderControls() {
   const s = webState.settings;
   webViews.wInput.value = String(s.w);
+  if (webViews.lockRatio) webViews.lockRatio.checked = s.lockRatio !== false;
   webViews.hInput.value = String(s.h);
   webViews.maxInput.value = String(s.maxColors);
   webViews.maxOut.textContent = String(s.maxColors);
@@ -674,10 +706,17 @@ function webAdoptSource(source) {
   webState.error = null;
   webState.zoom = 1;
   const ratio = source.height / source.width;
-  if (webState.settings.w === webState.settings.h && Math.abs(ratio - 1) > 0.12) {
-    webState.settings.h = clamp(Math.round(webState.settings.w * ratio), 8, 200);
+  let width = clamp(Math.round(webState.settings.w), 8, 200);
+  let height = clamp(Math.round(width * ratio), 8, 200);
+  if (height > 200) {
+    height = 200;
+    width = clamp(Math.round(height / ratio), 8, 200);
+  }
+  if (width !== webState.settings.w || height !== webState.settings.h) {
+    webState.settings.w = width;
+    webState.settings.h = height;
     webSaveSettings();
-    webToast(webT('size.adjusted', { w: webState.settings.w, h: webState.settings.h }));
+    webToast(webT('size.adjusted', { w: width, h: height }));
   }
   webRenderSource();
   webRenderControls();
@@ -809,3 +848,4 @@ if (document.readyState === 'loading') {
 } else {
   webBoot();
 }
+

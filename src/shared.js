@@ -15,6 +15,7 @@ const zh = {
   'size.width': '宽',
   'size.height': '高',
   'size.fit': '按原图比例',
+  'size.lock': '锁定原图比例',
   'size.note': '8–200 格 · 每格一颗豆',
   'size.adjusted': '已按原图比例调整为 {w} × {h}',
   'color.title': '颜色',
@@ -81,6 +82,7 @@ const en = {
   'size.width': 'Width',
   'size.height': 'Height',
   'size.fit': 'Fit image ratio',
+  'size.lock': 'Lock image ratio',
   'size.note': '8–200 cells · one bead per cell',
   'size.adjusted': 'Adjusted to {w} × {h} to match the image',
   'color.title': 'Colors',
@@ -182,6 +184,7 @@ const CSS = `
 .pdp-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--dsw-alias-label-secondary)}
 .pdp-badge{font-size:10.5px;font-weight:600;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);border-radius:999px;padding:1px 7px;font-variant-numeric:tabular-nums}
 .pdp-range{width:100%;accent-color:var(--dsw-alias-state-business-primary);margin:0;height:18px;cursor:pointer}
+.pdp-ratio-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
 .pdp-check{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--dsw-alias-label-primary);cursor:pointer;line-height:1.4}
 .pdp-check input{accent-color:var(--dsw-alias-state-business-primary);width:13px;height:13px;margin:0;flex:none;cursor:pointer}
 .pdp-check em{font-style:normal;color:var(--dsw-alias-label-tertiary);font-size:10.5px}
