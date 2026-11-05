@@ -3,6 +3,7 @@
  *
  *   src/palette.json  291 MARD colors
  *   src/engine.js     pure palette / sampling / quantization logic
+ *   src/shared.js     shared i18n / CSS / canvas rendering helpers
  *   src/ui.js         React + DOM browser half
  *
  * The engine starts with `const MARD = __MARD__;`; the placeholder is replaced
@@ -16,6 +17,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)));
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const palette = JSON.parse(readFileSync(join(root, 'src', 'palette.json'), 'utf8'));
 let engine = readFileSync(join(root, 'src', 'engine.js'), 'utf8');
+const shared = readFileSync(join(root, 'src', 'shared.js'), 'utf8');
 const ui = readFileSync(join(root, 'src', 'ui.js'), 'utf8');
 
 if (!engine.includes('const MARD = __MARD__;')) {
@@ -37,6 +39,7 @@ const bundle = [
   '  factory(require) {',
   '    const React = require("react");',
   engine.trim(),
+  shared.trim(),
   ui.trim(),
   '    return {',
   '      name: ' + JSON.stringify(pkg.name) + ',',

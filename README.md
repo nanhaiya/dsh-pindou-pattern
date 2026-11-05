@@ -1,10 +1,18 @@
 # 拼豆图纸工坊 · Bead Pattern Studio
 
-一个 DeepSeek Harness 插件：上传任意图片，生成 **MARD 色号** 的拼豆图纸，尺寸（格子数）自由设定，支持导出可打印的图纸 PNG 与色号清单 CSV。
+上传任意图片，生成 **MARD 色号** 的拼豆图纸。尺寸（格子数）自由设定，支持导出可打印的图纸 PNG 与色号清单 CSV。
+
+同一套渲染与算法提供三种形态：
+
+| 形态 | 入口 | 适用场景 |
+| --- | --- | --- |
+| DeepSeek Harness 插件 | 侧边栏「拼豆图纸工坊」 | 在 Harness 里边聊边出图 |
+| 单文件网页 | `web/index.html`（双击即可） | 手机、平板、任何浏览器 |
+| Windows 桌面版 | `build/BeadPatternStudio.exe` | 不装环境，双击就用 |
 
 ![示例输出](docs/sample-output.png)
 
-![工作台界面](docs/preview.png)
+![Harness 插件界面](docs/preview.png)
 
 ## 功能
 
@@ -17,9 +25,34 @@
 - **画布预览**：每一格都标注对应色号（默认开启，可关）、行列编号、5 格加粗网格、按底色自动反色、缩放 1×/2×/3×；为保证色号看得清，格子不小于 20px，宽图可横向滚动并自动居中。
 - **导出图纸 PNG**：标题 + 尺寸/色数/总颗数 + 四边行列编号 + 格内色号 + 色卡图例（色号 + 颗数）+ 页脚，长边最高 4100px。
 - **导出色号清单 CSV**：`code,hex,count` + `TOTAL` 行，带 UTF-8 BOM，Excel 直接打开不乱码。
-- 中英双语界面，跟随 Harness 语言；亮/暗主题跟随 `--dsw-alias-*` token；设置自动记住，可一键恢复默认。
+- 中英双语界面，一键切换；亮/暗主题自适应；设置自动记住，可一键恢复默认。
 
-## 安装
+## 网页版
+
+```bash
+node build-web.mjs          # 产出 web/index.html（约 96 KB，单文件）
+```
+
+- `web/index.html` 自带全部 CSS / JS / 291 色色卡，**双击就能用**，也可以直接丢到任意静态托管（GitHub Pages、Netlify、对象存储、内网 nginx）。
+- 所有处理都在浏览器本地完成，不上传图片、不请求后端；静态托管只需要托管这一个文件。
+- 打开后：选图 → 调尺寸/颜色 → 「导出图纸」下载 PNG，「CSV」导出色号清单。手机浏览器同样能用。
+
+![网页版](docs/web-preview.png)
+
+## Windows 桌面版
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File win\build-exe.ps1
+```
+
+- 产物：`build/BeadPatternStudio.exe`，**单文件约 900 KB**，内置网页与 WebView2 SDK 程序集，不需要 Node、不需要另外安装依赖。
+- 运行要求：Windows 10/11（自带 WebView2 运行时；若缺失会提示并可用系统浏览器打开）。
+- 首次启动会把 `index.html` 解到 `%LOCALAPPDATA%\BeadPatternStudio\`（WebView2 需要真实文件路径），设置留在同目录。
+- 导出时弹出系统「另存为」，默认落在 `Downloads`；CSV 与 PNG 都是本地生成。
+
+![Windows 桌面版](docs/exe-preview.png)
+
+## 安装（DSH 插件）
 
 从 npm 安装（发布后可用，装完出现在「插件中心」）：
 
@@ -69,28 +102,31 @@ dsh plugin add E:\workspace\pindou   # 或在 Harness 的插件面板里安装�
 
 - DSH 版本：`>= 0.2.1-rc.3`（`dsh.engines.dsh`）
 - 平台：Web（浏览器端 Canvas 渲染，无 Host 服务）
-- 运行环境：Node.js >= 20.3（宿主侧仅安装依赖，不需要额外服务）
+- 运行环境：Node.js >= 20.3（仅构建需要）
 - 浏览器：支持 Canvas 2D 的现代浏览器（Chrome / Edge / Safari 16+ / Firefox）
+- 桌面版：Windows 10/11 x64 + WebView2 运行时
 
 ## 权限与隐私
 
-- 图片**只在浏览器本地处理**：不上传、不发网络请求，导出文件由本地 Canvas 生成。
+- 图片**只在本地处理**：不上传、不发网络请求，导出文件由本地 Canvas 生成。
 - 不申请任何 DSH 工具、文件系统或凭据权限；Host 半只有空 `apply()`。
-- 设置（尺寸、色号范围、颜色上限等）存在浏览器 `localStorage`，可随时「恢复默认设置」清除。
+- 设置存在浏览器 `localStorage`（桌面版是 WebView2 的本地存储），可随时「恢复默认设置」清除。
 
 ## 开发
 
 ```bash
-node build.mjs     # 把 src/palette.json + engine.js + ui.js 打成 client.js
-node --check client.js
+node build.mjs              # src/palette.json + engine + shared + ui → client.js
+node build-web.mjs          # 同样的代码 → web/index.html（单文件）
 node test/engine.test.cjs   # 13 组引擎断言（色卡、聚类、抖动、去背、性能）
+powershell -File win\build-exe.ps1   # 内嵌 web/index.html → build/BeadPatternStudio.exe
 ```
 
 - `src/palette.json`：291 个 MARD 色号 `{code, hex, series}`。
 - `src/engine.js`：纯逻辑（采样、聚类、映射、抖动、背景判定），无 DOM 依赖。
-- `src/ui.js`：面板注册、界面、Canvas 预览与图纸渲染、导出、i18n。
-- `build.mjs`：把调色板内联进 `client.js`，产出 `window.__ModuleLoader__.load(...)` 模块。
-- `client.js`：构建产物，插件实际加载的文件。
+- `src/shared.js`：渲染层（`drawPattern`、`renderSheet`、CSV、示例图、i18n 文案、CSS），插件与网页共用。
+- `src/ui.js`：DSH 面板注册与 React 工作台，包在 `shared` 外面。
+- `src/webui.js`：网页版的 vanilla DOM 界面，同样复用 `shared`。
+- `win/Program.cs`：WinForms + WebView2 外壳，把 `web/index.html` 与 SDK 程序集内嵌进 exe。
 
 色卡数据整理自 [pixel-beads.com 的 MARD 色号表](https://www.pixel-beads.com/zh/mard-bead-color-chart)（291 色 / 标准 221 / 扩展 70）。
 
@@ -100,10 +136,22 @@ node test/engine.test.cjs   # 13 组引擎断言（色卡、聚类、抖动、�
 package.json          # dsh.bundle.patch + dsh.client 声明
 cordis.patch.yml      # 插入 pindou-pattern 条目
 index.js              # Host 半（无需服务，空实现）
-client.js             # 构建产物：角色面板 + 工作台 UI
-src/                  # 源码（palette / engine / ui）
+client.js             # 构建产物：Harness 面板
+src/
+  palette.json        # 291 色 MARD 色卡
+  engine.js           # 纯算法
+  shared.js           # 共用渲染 / 导出 / 文案
+  ui.js               # Harness UI（React）
+  webui.js            # 网页 UI（vanilla）
+build.mjs             # → client.js
+build-web.mjs         # → web/index.html
+web/index.html        # 单文件网页版
+win/Program.cs        # Windows 外壳
+win/build-exe.ps1     # → build/BeadPatternStudio.exe
+win/icon.ico          # 应用图标
 locale/{zh,en}.json   # 插件元信息文案
 icon.svg              # 侧栏图标
+docs/                 # 截图
 ```
 
 ## 许可

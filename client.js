@@ -423,17 +423,9 @@ function sampleGrid(source, w, h, createCanvas) {
   context.drawImage(canvas, 0, 0, w, h);
   return context.getImageData(0, 0, w, h).data;
 }
-/* ------------------------------------------------------------------ *
- * Perler pattern studio — browser half (DSH client bundle UI).
- * Rendered as a sidebar.panellist row plus a keyed main page.
- * ------------------------------------------------------------------ */
+/* 共用：文案、样式、编号格式化、图片加载、画布与图纸绘制（DSH 插件与独立网页版共用） */
 
-const NS = 'pindou-pattern';
-const PANEL_ID = 'pindou-workshop';
-const PANEL_ORDER = 32;
-const STORE_KEY = 'pindou-pattern:v1';
-const PRESETS = [25, 29, 48, 50, 64];
-
+/* ------------------------------ i18n ------------------------------ */
 const zh = {
   'entry.label': '拼豆图纸工坊',
   'app.title': '拼豆图纸工坊',
@@ -467,6 +459,7 @@ const zh = {
   'stats.colors': '{n} 色',
   'stats.busy': '正在生成…',
   'action.export': '导出图纸',
+  'action.csvShort': 'CSV',
   'action.exportCsv': '导出色号清单 CSV',
   'action.reset': '恢复默认设置',
   'action.retry': '重试',
@@ -475,6 +468,7 @@ const zh = {
   'action.zoomIn': '放大',
   'action.zoomOut': '缩小',
   'action.zoomFit': '适应',
+  'zoom.full': '全图',
   'empty.title': '上传一张图片，马上变成拼豆图纸',
   'empty.desc': '支持 PNG / JPG / WebP，也可以直接拖进这里或按 Ctrl+V 粘贴',
   'empty.cta': '选择图片',
@@ -531,6 +525,7 @@ const en = {
   'stats.colors': '{n} colors',
   'stats.busy': 'Generating…',
   'action.export': 'Export pattern',
+  'action.csvShort': 'CSV',
   'action.exportCsv': 'Export code list (CSV)',
   'action.reset': 'Restore defaults',
   'action.retry': 'Retry',
@@ -539,6 +534,7 @@ const en = {
   'action.zoomIn': 'Zoom in',
   'action.zoomOut': 'Zoom out',
   'action.zoomFit': 'Fit',
+  'zoom.full': 'Full',
   'empty.title': 'Drop an image and get a bead pattern',
   'empty.desc': 'PNG, JPG or WebP — drag it here or paste with Ctrl+V',
   'empty.cta': 'Choose an image',
@@ -682,50 +678,6 @@ const CSS = `
   .pdp-sub{display:none}
 }
 `;
-
-function injectStyles() {
-  if (typeof document === 'undefined') return;
-  const id = 'dsh-pindou-pattern:styles';
-  if (document.querySelector('style[data-plugin-css="' + id + '"]')) return;
-  const tag = document.createElement('style');
-  tag.dataset.plugin = 'dsh-pindou-pattern';
-  tag.dataset.pluginCss = id;
-  tag.textContent = CSS;
-  document.head.appendChild(tag);
-}
-
-function activeLang(ctx) {
-  try {
-    const snapshot = ctx.locale.getSnapshot();
-    const code = String((snapshot && snapshot.active) || (typeof document !== 'undefined' ? document.documentElement.lang : 'zh') || 'zh').toLowerCase();
-    return code.indexOf('en') === 0 ? 'en' : 'zh';
-  } catch (error) {
-    return 'zh';
-  }
-}
-
-function interpolate(text, values) {
-  if (!values) return text;
-  return String(text).replace(/\{(\w+)\}/g, (match, key) => (key in values ? String(values[key]) : match));
-}
-
-const boundTranslators = new WeakMap();
-
-function translate(ctx, key, values) {
-  try {
-    let bound = boundTranslators.get(ctx);
-    if (!bound) {
-      bound = ctx.locale.bind(NS);
-      boundTranslators.set(ctx, bound);
-    }
-    const text = bound(key, values);
-    if (typeof text === 'string' && text !== key && text.indexOf(key) !== 0) return text;
-  } catch (error) {
-    /* fall through to the embedded dictionaries */
-  }
-  return interpolate((activeLang(ctx) === 'en' ? en : zh)[key] || key, values);
-}
-
 function formatNumber(value, lang) {
   try {
     return new Intl.NumberFormat(lang === 'en' ? 'en-US' : 'zh-CN').format(value);
@@ -733,367 +685,12 @@ function formatNumber(value, lang) {
     return String(value);
   }
 }
-
-function normalizeSettings(raw) {
-  const num = (value, fallback, min, max) => {
-    const n = Math.round(Number(value));
-    return Number.isFinite(n) ? clamp(n, min, max) : fallback;
-  };
-  return {
-    w: num(raw.w, 50, 8, 200),
-    h: num(raw.h, 50, 8, 200),
-    maxColors: num(raw.maxColors, 24, 2, 64),
-    scope: raw.scope === 'all' ? 'all' : 'standard',
-    dither: raw.dither === true,
-    removeBg: raw.removeBg === true,
-    tolerance: num(raw.tolerance, 12, 0, 60),
-    showCodes: raw.showCodes !== false,
-  };
-}
-
-function loadSettings() {
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (!raw) return normalizeSettings({});
-    const parsed = JSON.parse(raw);
-    return normalizeSettings(parsed && typeof parsed === 'object' ? parsed : {});
-  } catch (error) {
-    return normalizeSettings({});
-  }
-}
-
-function saveSettings(settings) {
-  try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(settings));
-  } catch (error) {
-    /* storage unavailable: settings last for this mount only */
-  }
-}
-
 function createCanvas(width, height) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   return canvas;
 }
-
-function createStore() {
-  let state = {
-    source: null,
-    settings: loadSettings(),
-    pattern: null,
-    busy: false,
-    error: null,
-    zoom: 1,
-    sheet: null,
-    toast: null,
-  };
-  let timer = 0;
-  let toastSeq = 0;
-  let toastTimer = 0;
-  const listeners = new Set();
-
-  const getSnapshot = () => state;
-  const subscribe = (listener) => {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-  };
-  const emit = () => {
-    for (const listener of Array.from(listeners)) {
-      try {
-        listener();
-      } catch (error) {
-        console.warn('[pindou-pattern] listener failed', error);
-      }
-    }
-  };
-  const patch = (next) => {
-    state = Object.assign({}, state, next);
-    emit();
-  };
-
-  function rebuild() {
-    clearTimeout(timer);
-    if (!state.source) {
-      patch({ pattern: null, busy: false, error: null });
-      return;
-    }
-    patch({ busy: true, error: null });
-    timer = setTimeout(() => {
-      const current = state;
-      if (!current.source) return;
-      const started = Date.now();
-      try {
-        const rgba = sampleGrid(current.source.canvas, current.settings.w, current.settings.h, createCanvas);
-        const pattern = buildPattern(rgba, current.settings.w, current.settings.h, {
-          maxColors: current.settings.maxColors,
-          scope: current.settings.scope,
-          dither: current.settings.dither,
-          removeBg: current.settings.removeBg,
-          tolerance: current.settings.tolerance,
-        });
-        pattern.ms = Date.now() - started;
-        patch({ pattern, busy: false, error: null });
-      } catch (error) {
-        const code = error && error.code === 'empty' ? 'empty' : 'build';
-        patch({ pattern: null, busy: false, error: code });
-      }
-    }, 80);
-  }
-
-  function setSettings(partial) {
-    const next = normalizeSettings(Object.assign({}, state.settings, partial));
-    const changed = JSON.stringify(next) !== JSON.stringify(state.settings);
-    if (!changed) return;
-    saveSettings(next);
-    patch({ settings: next });
-    rebuild();
-  }
-
-  function releaseSource(source) {
-    if (source && source.owned && source.url) {
-      try {
-        URL.revokeObjectURL(source.url);
-      } catch (error) {
-        /* ignore */
-      }
-    }
-  }
-
-  function setSource(source, settings) {
-    if (source === state.source) return;
-    releaseSource(state.source);
-    const next = settings ? normalizeSettings(settings) : state.settings;
-    if (settings) saveSettings(next);
-    patch({ source, settings: next, pattern: null, busy: !!source, error: null, zoom: 1, sheet: null });
-    rebuild();
-  }
-
-  function clearImage() {
-    releaseSource(state.source);
-    patch({ source: null, pattern: null, busy: false, error: null, zoom: 1, sheet: null });
-  }
-
-  function setZoom(zoom) {
-    patch({ zoom: clamp(Math.round(zoom), 1, 3) });
-  }
-
-  function resetSettings() {
-    const next = normalizeSettings({});
-    saveSettings(next);
-    patch({ settings: next });
-    rebuild();
-  }
-
-  function toast(message) {
-    const id = (toastSeq += 1);
-    patch({ toast: { id, message } });
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => {
-      if (state.toast && state.toast.id === id) patch({ toast: null });
-    }, 2800);
-  }
-
-  function setSheet(sheet) {
-    patch({ sheet });
-  }
-
-  return {
-    getSnapshot,
-    subscribe,
-    setSettings,
-    setSource,
-    clearImage,
-    setZoom,
-    resetSettings,
-    toast,
-    setSheet,
-    rebuild,
-  };
-}
-
-let singletonStore = null;
-function getStore() {
-  if (!singletonStore) singletonStore = createStore();
-  return singletonStore;
-}
-
-function useStore(store) {
-  return React.useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
-}
-
-function useLang(ctx) {
-  const snapshot = React.useSyncExternalStore(
-    (listener) => ctx.locale.subscribe(listener),
-    () => ctx.locale.getSnapshot(),
-    () => ctx.locale.getSnapshot(),
-  );
-  const code = String((snapshot && snapshot.active) || '').toLowerCase();
-  return code.indexOf('en') === 0 ? 'en' : 'zh';
-}
-
-/* ------------------------------- icons ------------------------------- */
-
-function SvgIcon({ size = 16, children }) {
-  return React.createElement(
-    'svg',
-    {
-      width: size,
-      height: size,
-      viewBox: '0 0 24 24',
-      fill: 'none',
-      stroke: 'currentColor',
-      strokeWidth: 1.7,
-      strokeLinecap: 'round',
-      strokeLinejoin: 'round',
-      'aria-hidden': 'true',
-      focusable: 'false',
-    },
-    children,
-  );
-}
-
-function IconUpload({ size = 16 }) {
-  return React.createElement(SvgIcon, { size }, React.createElement('path', { d: 'M12 16V4m0 0 4 4m-4-4L8 8M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2' }));
-}
-function IconImage({ size = 16 }) {
-  return React.createElement(
-    SvgIcon,
-    { size },
-    React.createElement('rect', { x: 3, y: 4, width: 18, height: 16, rx: 2.5 }),
-    React.createElement('circle', { cx: 8.5, cy: 9.5, r: 1.6 }),
-    React.createElement('path', { d: 'm4 17 5-5 4 4 3-3 4 4' }),
-  );
-}
-function IconDownload({ size = 16 }) {
-  return React.createElement(SvgIcon, { size }, React.createElement('path', { d: 'M12 4v11m0 0 4-4m-4 4-4-4M4 20h16' }));
-}
-function IconClose({ size = 16 }) {
-  return React.createElement(SvgIcon, { size }, React.createElement('path', { d: 'M6 6 18 18M18 6 6 18' }));
-}
-function IconPlus({ size = 14 }) {
-  return React.createElement(SvgIcon, { size }, React.createElement('path', { d: 'M12 5v14M5 12h14' }));
-}
-function IconMinus({ size = 14 }) {
-  return React.createElement(SvgIcon, { size }, React.createElement('path', { d: 'M5 12h14' }));
-}
-function IconSparkle({ size = 15 }) {
-  return React.createElement(SvgIcon, { size }, React.createElement('path', { d: 'M12 3.5 13.8 7.7 18 9.5l-4.2 1.8L12 15.5l-1.8-4.2L6 9.5l4.2-1.8L12 3.5ZM18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1Z' }));
-}
-function IconRatio({ size = 14 }) {
-  return React.createElement(
-    SvgIcon,
-    { size },
-    React.createElement('rect', { x: 3.5, y: 5.5, width: 17, height: 13, rx: 2 }),
-    React.createElement('path', { d: 'M8 12h8M8 12l2-2m-2 2 2 2M16 12l-2-2m2 2-2 2' }),
-  );
-}
-function IconAlert({ size = 20 }) {
-  return React.createElement(
-    SvgIcon,
-    { size },
-    React.createElement('path', { d: 'M12 3.5 2.7 20h18.6L12 3.5Z' }),
-    React.createElement('path', { d: 'M12 9.5v4.5M12 17.5h.01' }),
-  );
-}
-function IconGrid({ size = 15 }) {
-  return React.createElement(
-    SvgIcon,
-    { size },
-    React.createElement('rect', { x: 3.5, y: 3.5, width: 7, height: 7, rx: 1 }),
-    React.createElement('rect', { x: 13.5, y: 3.5, width: 7, height: 7, rx: 1 }),
-    React.createElement('rect', { x: 3.5, y: 13.5, width: 7, height: 7, rx: 1 }),
-    React.createElement('rect', { x: 13.5, y: 13.5, width: 7, height: 7, rx: 1 }),
-  );
-}
-
-function beadPath(cx, cy, radius, hole) {
-  return (
-    'M' + cx + ' ' + (cy - radius) +
-    'a' + radius + ' ' + radius + ' 0 1 0 0 ' + radius * 2 +
-    'a' + radius + ' ' + radius + ' 0 1 0 0 ' + (-radius * 2) +
-    'Z M' + cx + ' ' + (cy - hole) +
-    'a' + hole + ' ' + hole + ' 0 1 0 0 ' + hole * 2 +
-    'a' + hole + ' ' + hole + ' 0 1 0 0 ' + (-hole * 2) + 'Z'
-  );
-}
-
-function BeadMark({ size = 18 }) {
-  const radius = 2.7;
-  const hole = 0.95;
-  let d = '';
-  for (const [cx, cy] of [[4, 4], [12, 4], [4, 12], [12, 12]]) {
-    d += beadPath(cx, cy, radius, hole);
-  }
-  return React.createElement(
-    'svg',
-    { width: size, height: size, viewBox: '0 0 16 16', fill: 'currentColor', 'aria-hidden': 'true', focusable: 'false' },
-    React.createElement('path', { d, fillRule: 'evenodd' }),
-  );
-}
-
-function PanelIcon({ size = 16 }) {
-  return React.createElement(BeadMark, { size });
-}
-
-/* ------------------------------ widgets ------------------------------ */
-
-function Section({ title, extra, children }) {
-  return React.createElement(
-    'section',
-    { className: 'pdp-card' },
-    React.createElement(
-      'div',
-      { className: 'pdp-card-head' },
-      React.createElement('h2', null, title),
-      extra || null,
-    ),
-    React.createElement('div', { className: 'pdp-card-body' }, children),
-  );
-}
-
-function NumberField({ value, min, max, onCommit, label }) {
-  const [text, setText] = React.useState(String(value));
-  React.useEffect(() => {
-    setText(String(value));
-  }, [value]);
-  const commit = () => {
-    const parsed = Math.round(Number(text));
-    if (Number.isFinite(parsed)) {
-      const next = clamp(parsed, min, max);
-      setText(String(next));
-      if (next !== value) onCommit(next);
-    } else {
-      setText(String(value));
-    }
-  };
-  return React.createElement('input', {
-    className: 'pdp-input',
-    type: 'number',
-    inputMode: 'numeric',
-    min,
-    max,
-    value: text,
-    'aria-label': label,
-    onChange: (event) => setText(event.target.value),
-    onBlur: commit,
-    onKeyDown: (event) => {
-      if (event.key === 'Enter') event.currentTarget.blur();
-    },
-  });
-}
-
-function Toggle({ checked, onChange, label }) {
-  return React.createElement(
-    'label',
-    { className: 'pdp-check' },
-    React.createElement('input', { type: 'checkbox', checked, onChange: (event) => onChange(event.target.checked) }),
-    React.createElement('span', null, label),
-  );
-}
-
-/* ------------------------------ pattern ------------------------------ */
-
 function loadSourceFile(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -1175,21 +772,29 @@ function fileNameFor(pat, source, extension) {
   return base + '-' + pat.w + 'x' + pat.h + '-mard.' + extension;
 }
 
-/* ------------------------------ drawing ------------------------------ */
-
 function drawPattern(canvas, pattern, options) {
-  const zoom = options.zoom || 1;
+  const zoom = options.zoom === 0 ? 0 : options.zoom || 1;
   const stageWidth = options.stageWidth || 760;
+  const stageHeight = options.stageHeight || 0;
   const showCodes = options.showCodes !== false;
   const digits = String(Math.max(pattern.w, pattern.h)).length;
   const band = clamp(12 + digits * 6, 18, 34);
   const pad = 14;
   const available = Math.max(120, stageWidth - pad * 2 - band - 2);
-  // 每个格子都要写色号：保证 cell 至少 12px 放得下 2~3 个字符，宽图横向滚动
-  const minCell = showCodes ? 20 : 4;
-  let cell = Math.floor(available / pattern.w);
-  cell = clamp(cell, minCell, 44);
-  if (zoom > 1) cell = Math.round(cell * zoom);
+  const availableH = stageHeight > 0 ? Math.max(120, stageHeight - pad * 2 - band - 2) : 0;
+  let cell;
+  if (zoom === 0) {
+    // 整图模式：宽高一起塞进舞台，太小的时候不画色号
+    cell = Math.floor(available / pattern.w);
+    if (availableH > 0) cell = Math.min(cell, Math.floor(availableH / pattern.h));
+    cell = clamp(cell, 4, 44);
+  } else {
+    // 细节模式：保证色号放得下，宽图横向滚动
+    const minCell = showCodes ? 20 : 4;
+    cell = Math.floor(available / pattern.w);
+    cell = clamp(cell, minCell, 44);
+    if (zoom > 1) cell = Math.round(cell * zoom);
+  }
   const dpr = clamp(window.devicePixelRatio || 1, 1, 2);
   const maxDevice = 8192;
   const cellLimit = Math.floor(maxDevice / (Math.max(pattern.w, pattern.h) * dpr));
@@ -1438,6 +1043,416 @@ function renderSheet(pattern, labels, lang) {
 
   return canvas;
 }
+/* ------------------------------------------------------------------ *
+ * Perler pattern studio — browser half (DSH client bundle UI).
+ * Rendered as a sidebar.panellist row plus a keyed main page.
+ * ------------------------------------------------------------------ */
+
+const NS = 'pindou-pattern';
+const PANEL_ID = 'pindou-workshop';
+const PANEL_ORDER = 32;
+const STORE_KEY = 'pindou-pattern:v1';
+const PRESETS = [25, 29, 48, 50, 64];
+
+function injectStyles() {
+  if (typeof document === 'undefined') return;
+  const id = 'dsh-pindou-pattern:styles';
+  if (document.querySelector('style[data-plugin-css="' + id + '"]')) return;
+  const tag = document.createElement('style');
+  tag.dataset.plugin = 'dsh-pindou-pattern';
+  tag.dataset.pluginCss = id;
+  tag.textContent = CSS;
+  document.head.appendChild(tag);
+}
+
+function activeLang(ctx) {
+  try {
+    const snapshot = ctx.locale.getSnapshot();
+    const code = String((snapshot && snapshot.active) || (typeof document !== 'undefined' ? document.documentElement.lang : 'zh') || 'zh').toLowerCase();
+    return code.indexOf('en') === 0 ? 'en' : 'zh';
+  } catch (error) {
+    return 'zh';
+  }
+}
+
+function interpolate(text, values) {
+  if (!values) return text;
+  return String(text).replace(/\{(\w+)\}/g, (match, key) => (key in values ? String(values[key]) : match));
+}
+
+const boundTranslators = new WeakMap();
+
+function translate(ctx, key, values) {
+  try {
+    let bound = boundTranslators.get(ctx);
+    if (!bound) {
+      bound = ctx.locale.bind(NS);
+      boundTranslators.set(ctx, bound);
+    }
+    const text = bound(key, values);
+    if (typeof text === 'string' && text !== key && text.indexOf(key) !== 0) return text;
+  } catch (error) {
+    /* fall through to the embedded dictionaries */
+  }
+  return interpolate((activeLang(ctx) === 'en' ? en : zh)[key] || key, values);
+}
+
+
+function normalizeSettings(raw) {
+  const num = (value, fallback, min, max) => {
+    const n = Math.round(Number(value));
+    return Number.isFinite(n) ? clamp(n, min, max) : fallback;
+  };
+  return {
+    w: num(raw.w, 50, 8, 200),
+    h: num(raw.h, 50, 8, 200),
+    maxColors: num(raw.maxColors, 24, 2, 64),
+    scope: raw.scope === 'all' ? 'all' : 'standard',
+    dither: raw.dither === true,
+    removeBg: raw.removeBg === true,
+    tolerance: num(raw.tolerance, 12, 0, 60),
+    showCodes: raw.showCodes !== false,
+  };
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return normalizeSettings({});
+    const parsed = JSON.parse(raw);
+    return normalizeSettings(parsed && typeof parsed === 'object' ? parsed : {});
+  } catch (error) {
+    return normalizeSettings({});
+  }
+}
+
+function saveSettings(settings) {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(settings));
+  } catch (error) {
+    /* storage unavailable: settings last for this mount only */
+  }
+}
+
+
+function createStore() {
+  let state = {
+    source: null,
+    settings: loadSettings(),
+    pattern: null,
+    busy: false,
+    error: null,
+    zoom: 1,
+    sheet: null,
+    toast: null,
+  };
+  let timer = 0;
+  let toastSeq = 0;
+  let toastTimer = 0;
+  const listeners = new Set();
+
+  const getSnapshot = () => state;
+  const subscribe = (listener) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  };
+  const emit = () => {
+    for (const listener of Array.from(listeners)) {
+      try {
+        listener();
+      } catch (error) {
+        console.warn('[pindou-pattern] listener failed', error);
+      }
+    }
+  };
+  const patch = (next) => {
+    state = Object.assign({}, state, next);
+    emit();
+  };
+
+  function rebuild() {
+    clearTimeout(timer);
+    if (!state.source) {
+      patch({ pattern: null, busy: false, error: null });
+      return;
+    }
+    patch({ busy: true, error: null });
+    timer = setTimeout(() => {
+      const current = state;
+      if (!current.source) return;
+      const started = Date.now();
+      try {
+        const rgba = sampleGrid(current.source.canvas, current.settings.w, current.settings.h, createCanvas);
+        const pattern = buildPattern(rgba, current.settings.w, current.settings.h, {
+          maxColors: current.settings.maxColors,
+          scope: current.settings.scope,
+          dither: current.settings.dither,
+          removeBg: current.settings.removeBg,
+          tolerance: current.settings.tolerance,
+        });
+        pattern.ms = Date.now() - started;
+        patch({ pattern, busy: false, error: null });
+      } catch (error) {
+        const code = error && error.code === 'empty' ? 'empty' : 'build';
+        patch({ pattern: null, busy: false, error: code });
+      }
+    }, 80);
+  }
+
+  function setSettings(partial) {
+    const next = normalizeSettings(Object.assign({}, state.settings, partial));
+    const changed = JSON.stringify(next) !== JSON.stringify(state.settings);
+    if (!changed) return;
+    saveSettings(next);
+    patch({ settings: next });
+    rebuild();
+  }
+
+  function releaseSource(source) {
+    if (source && source.owned && source.url) {
+      try {
+        URL.revokeObjectURL(source.url);
+      } catch (error) {
+        /* ignore */
+      }
+    }
+  }
+
+  function setSource(source, settings) {
+    if (source === state.source) return;
+    releaseSource(state.source);
+    const next = settings ? normalizeSettings(settings) : state.settings;
+    if (settings) saveSettings(next);
+    patch({ source, settings: next, pattern: null, busy: !!source, error: null, zoom: 1, sheet: null });
+    rebuild();
+  }
+
+  function clearImage() {
+    releaseSource(state.source);
+    patch({ source: null, pattern: null, busy: false, error: null, zoom: 1, sheet: null });
+  }
+
+  function setZoom(zoom) {
+    patch({ zoom: clamp(Math.round(zoom), 0, 3) });
+  }
+
+  function resetSettings() {
+    const next = normalizeSettings({});
+    saveSettings(next);
+    patch({ settings: next });
+    rebuild();
+  }
+
+  function toast(message) {
+    const id = (toastSeq += 1);
+    patch({ toast: { id, message } });
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      if (state.toast && state.toast.id === id) patch({ toast: null });
+    }, 2800);
+  }
+
+  function setSheet(sheet) {
+    patch({ sheet });
+  }
+
+  return {
+    getSnapshot,
+    subscribe,
+    setSettings,
+    setSource,
+    clearImage,
+    setZoom,
+    resetSettings,
+    toast,
+    setSheet,
+    rebuild,
+  };
+}
+
+let singletonStore = null;
+function getStore() {
+  if (!singletonStore) singletonStore = createStore();
+  return singletonStore;
+}
+
+function useStore(store) {
+  return React.useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+}
+
+function useLang(ctx) {
+  const snapshot = React.useSyncExternalStore(
+    (listener) => ctx.locale.subscribe(listener),
+    () => ctx.locale.getSnapshot(),
+    () => ctx.locale.getSnapshot(),
+  );
+  const code = String((snapshot && snapshot.active) || '').toLowerCase();
+  return code.indexOf('en') === 0 ? 'en' : 'zh';
+}
+
+/* ------------------------------- icons ------------------------------- */
+
+function SvgIcon({ size = 16, children }) {
+  return React.createElement(
+    'svg',
+    {
+      width: size,
+      height: size,
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      strokeWidth: 1.7,
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+      'aria-hidden': 'true',
+      focusable: 'false',
+    },
+    children,
+  );
+}
+
+function IconUpload({ size = 16 }) {
+  return React.createElement(SvgIcon, { size }, React.createElement('path', { d: 'M12 16V4m0 0 4 4m-4-4L8 8M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2' }));
+}
+function IconImage({ size = 16 }) {
+  return React.createElement(
+    SvgIcon,
+    { size },
+    React.createElement('rect', { x: 3, y: 4, width: 18, height: 16, rx: 2.5 }),
+    React.createElement('circle', { cx: 8.5, cy: 9.5, r: 1.6 }),
+    React.createElement('path', { d: 'm4 17 5-5 4 4 3-3 4 4' }),
+  );
+}
+function IconDownload({ size = 16 }) {
+  return React.createElement(SvgIcon, { size }, React.createElement('path', { d: 'M12 4v11m0 0 4-4m-4 4-4-4M4 20h16' }));
+}
+function IconClose({ size = 16 }) {
+  return React.createElement(SvgIcon, { size }, React.createElement('path', { d: 'M6 6 18 18M18 6 6 18' }));
+}
+function IconPlus({ size = 14 }) {
+  return React.createElement(SvgIcon, { size }, React.createElement('path', { d: 'M12 5v14M5 12h14' }));
+}
+function IconMinus({ size = 14 }) {
+  return React.createElement(SvgIcon, { size }, React.createElement('path', { d: 'M5 12h14' }));
+}
+function IconSparkle({ size = 15 }) {
+  return React.createElement(SvgIcon, { size }, React.createElement('path', { d: 'M12 3.5 13.8 7.7 18 9.5l-4.2 1.8L12 15.5l-1.8-4.2L6 9.5l4.2-1.8L12 3.5ZM18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1Z' }));
+}
+function IconRatio({ size = 14 }) {
+  return React.createElement(
+    SvgIcon,
+    { size },
+    React.createElement('rect', { x: 3.5, y: 5.5, width: 17, height: 13, rx: 2 }),
+    React.createElement('path', { d: 'M8 12h8M8 12l2-2m-2 2 2 2M16 12l-2-2m2 2-2 2' }),
+  );
+}
+function IconAlert({ size = 20 }) {
+  return React.createElement(
+    SvgIcon,
+    { size },
+    React.createElement('path', { d: 'M12 3.5 2.7 20h18.6L12 3.5Z' }),
+    React.createElement('path', { d: 'M12 9.5v4.5M12 17.5h.01' }),
+  );
+}
+function IconGrid({ size = 15 }) {
+  return React.createElement(
+    SvgIcon,
+    { size },
+    React.createElement('rect', { x: 3.5, y: 3.5, width: 7, height: 7, rx: 1 }),
+    React.createElement('rect', { x: 13.5, y: 3.5, width: 7, height: 7, rx: 1 }),
+    React.createElement('rect', { x: 3.5, y: 13.5, width: 7, height: 7, rx: 1 }),
+    React.createElement('rect', { x: 13.5, y: 13.5, width: 7, height: 7, rx: 1 }),
+  );
+}
+
+function beadPath(cx, cy, radius, hole) {
+  return (
+    'M' + cx + ' ' + (cy - radius) +
+    'a' + radius + ' ' + radius + ' 0 1 0 0 ' + radius * 2 +
+    'a' + radius + ' ' + radius + ' 0 1 0 0 ' + (-radius * 2) +
+    'Z M' + cx + ' ' + (cy - hole) +
+    'a' + hole + ' ' + hole + ' 0 1 0 0 ' + hole * 2 +
+    'a' + hole + ' ' + hole + ' 0 1 0 0 ' + (-hole * 2) + 'Z'
+  );
+}
+
+function BeadMark({ size = 18 }) {
+  const radius = 2.7;
+  const hole = 0.95;
+  let d = '';
+  for (const [cx, cy] of [[4, 4], [12, 4], [4, 12], [12, 12]]) {
+    d += beadPath(cx, cy, radius, hole);
+  }
+  return React.createElement(
+    'svg',
+    { width: size, height: size, viewBox: '0 0 16 16', fill: 'currentColor', 'aria-hidden': 'true', focusable: 'false' },
+    React.createElement('path', { d, fillRule: 'evenodd' }),
+  );
+}
+
+function PanelIcon({ size = 16 }) {
+  return React.createElement(BeadMark, { size });
+}
+
+/* ------------------------------ widgets ------------------------------ */
+
+function Section({ title, extra, children }) {
+  return React.createElement(
+    'section',
+    { className: 'pdp-card' },
+    React.createElement(
+      'div',
+      { className: 'pdp-card-head' },
+      React.createElement('h2', null, title),
+      extra || null,
+    ),
+    React.createElement('div', { className: 'pdp-card-body' }, children),
+  );
+}
+
+function NumberField({ value, min, max, onCommit, label }) {
+  const [text, setText] = React.useState(String(value));
+  React.useEffect(() => {
+    setText(String(value));
+  }, [value]);
+  const commit = () => {
+    const parsed = Math.round(Number(text));
+    if (Number.isFinite(parsed)) {
+      const next = clamp(parsed, min, max);
+      setText(String(next));
+      if (next !== value) onCommit(next);
+    } else {
+      setText(String(value));
+    }
+  };
+  return React.createElement('input', {
+    className: 'pdp-input',
+    type: 'number',
+    inputMode: 'numeric',
+    min,
+    max,
+    value: text,
+    'aria-label': label,
+    onChange: (event) => setText(event.target.value),
+    onBlur: commit,
+    onKeyDown: (event) => {
+      if (event.key === 'Enter') event.currentTarget.blur();
+    },
+  });
+}
+
+function Toggle({ checked, onChange, label }) {
+  return React.createElement(
+    'label',
+    { className: 'pdp-check' },
+    React.createElement('input', { type: 'checkbox', checked, onChange: (event) => onChange(event.target.checked) }),
+    React.createElement('span', null, label),
+  );
+}
+
+/* ------------------------------ pattern ------------------------------ */
+
+/* ------------------------------ drawing ------------------------------ */
 
 /* ------------------------------ components ------------------------------ */
 
@@ -1450,12 +1465,16 @@ function Page({ ctx, store }) {
   const scrollRef = React.useRef(null);
   const fileRef = React.useRef(null);
   const [stageWidth, setStageWidth] = React.useState(760);
+  const [stageHeight, setStageHeight] = React.useState(620);
   const [dragOver, setDragOver] = React.useState(false);
 
   React.useEffect(() => {
     const element = scrollRef.current;
     if (!element) return undefined;
-    const update = () => setStageWidth(element.clientWidth || 760);
+    const update = () => {
+      setStageWidth(element.clientWidth || 760);
+      setStageHeight(element.clientHeight || 620);
+    };
     update();
     if (typeof ResizeObserver === 'function') {
       const observer = new ResizeObserver(update);
@@ -1471,6 +1490,7 @@ function Page({ ctx, store }) {
     if (!canvas || !snap.pattern) return;
     drawPattern(canvas, snap.pattern, {
       stageWidth,
+      stageHeight,
       zoom: snap.zoom,
       showCodes: snap.settings.showCodes,
     });
@@ -1478,7 +1498,7 @@ function Page({ ctx, store }) {
     if (scroller && scroller.scrollWidth > scroller.clientWidth + 1) {
       scroller.scrollLeft = Math.round((scroller.scrollWidth - scroller.clientWidth) / 2);
     }
-  }, [snap.pattern, snap.zoom, snap.settings.showCodes, stageWidth]);
+  }, [snap.pattern, snap.zoom, snap.settings.showCodes, stageWidth, stageHeight]);
 
   const handleFile = React.useCallback(
     async (file) => {
@@ -2010,13 +2030,13 @@ function Page({ ctx, store }) {
                 {
                   type: 'button',
                   onClick: () => store.setZoom(snap.zoom - 1),
-                  disabled: snap.zoom <= 1,
+                  disabled: snap.zoom <= 0,
                   'aria-label': t('action.zoomOut'),
                   title: t('action.zoomOut'),
                 },
                 React.createElement(IconMinus, { size: 13 }),
               ),
-              React.createElement('span', null, snap.zoom + '×'),
+              React.createElement('span', null, snap.zoom === 0 ? t('zoom.full') : snap.zoom + '×'),
               React.createElement(
                 'button',
                 {
@@ -2030,7 +2050,7 @@ function Page({ ctx, store }) {
               ),
               React.createElement(
                 'button',
-                { type: 'button', className: 'pdp-zoomfit', onClick: () => store.setZoom(1) },
+                { type: 'button', className: 'pdp-zoomfit', onClick: () => store.setZoom(0) },
                 t('action.zoomFit'),
               ),
             ),

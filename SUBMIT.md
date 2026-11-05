@@ -103,21 +103,25 @@ MIT
 
 ## 发布物
 
-`dist/` 里是打包好的发布文件：
+`dist/` 里是三个形态的发布文件：
 
 | 文件 | 大小 | SHA-256 |
 | --- | --- | --- |
-| `dsh-pindou-pattern-0.1.0.tgz` | 544,812 B | `b723d1b6491a37bbd9e826d0fea64d5b9eef283f2f72601ec85d7dcc3ccd7a69` |
-| `dsh-pindou-pattern-0.1.0.zip` | 573,482 B | `6d87623732c2a6efb0d29e318d1b862fe0750d00adfe531731e6f9234f73b5a7` |
+| `dsh-pindou-pattern-0.1.0.tgz` | 541,966 B | `682fa9756216e3f3d9bc3317136a8cca9bc1f1b93acb5acc157f70216501b542` |
+| `BeadPatternStudio.exe` | 917,504 B | `e1648ed674ded0bff77219138c06d913047d98502b8865c27ed2877bc8231289` |
+| `pindou-web.zip` | 25,098 B | `89ba35108d5376c375858e52615796fa23aae2fba90468103930332ad43a17af` |
 
-- **.tgz** 是 npm 包（11 个文件：`package.json`、`index.js`、`client.js`、`cordis.patch.yml`、`icon.svg`、`locale/`、`docs/`、README、LICENSE）。
+- **.tgz** 是 npm 包（`package.json`、`index.js`、`client.js`、`cordis.patch.yml`、`icon.svg`、`locale/`、`src/`、`web/`、`win/`、`docs/`、README、LICENSE）。
   - 直接发布：`npm publish dist/dsh-pindou-pattern-0.1.0.tgz`
   - 或本地试装：`dsh plugin add dist/dsh-pindou-pattern-0.1.0.tgz`
-- **.zip** 是完整源码包（18 个文件，含 `src/`、`build.mjs`、`test/`、`docs/`、SUBMIT.md），适合当 GitHub Release 附件。
+- **.exe** 是 Windows 桌面版（单文件，内置网页 + WebView2 SDK 程序集），双击即用。
+- **.zip** 里是 `index.html` 单文件网页版，解压后双击即可，也可以整份传到你自己的静态托管。
 
 重新打包：
 
 ```bash
-node build.mjs
+node build.mjs && node build-web.mjs
 npm pack --pack-destination dist
+powershell -File win/build-exe.ps1
+powershell -Command "Compress-Archive web/index.html dist/pindou-web.zip -Force"
 ```

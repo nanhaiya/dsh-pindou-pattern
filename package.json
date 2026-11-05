@@ -22,11 +22,17 @@
   "files": [
     "index.js",
     "client.js",
+    "build.mjs",
+    "build-web.mjs",
     "cordis.patch.yml",
     "icon.svg",
     "locale",
+    "src",
+    "web",
+    "win",
     "docs",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "keywords": [
     "dsh",
@@ -61,7 +67,9 @@
   "scripts": {
     "build": "node build.mjs",
     "check": "node --check client.js && node test/engine.test.cjs",
-    "prepublishOnly": "node build.mjs && node test/engine.test.cjs"
+    "prepublishOnly": "node build.mjs && node test/engine.test.cjs",
+    "build:web": "node build-web.mjs",
+    "build:exe": "powershell -NoProfile -ExecutionPolicy Bypass -File win/build-exe.ps1"
   },
   "peerDependencies": {
     "react": "^18.2.0"

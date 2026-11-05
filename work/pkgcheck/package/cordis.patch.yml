@@ -1,6 +1,0 @@
-# dsh-pindou-pattern bundle patch: mounts the Host half into the profile.
-# The browser half is discovered from package.json `dsh.client`, which loads
-# client.js and registers the sidebar entry plus the workshop page.
-- insert:
-    - id: pindou-pattern
-      name: 'dsh-pindou-pattern'
