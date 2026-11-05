@@ -64,7 +64,7 @@ dsh plugin --profile web add dsh-pindou-pattern
 或直接源码安装这个仓库：
 
 ```bash
-dsh plugin --profile web add github:<owner>/dsh-pindou-pattern
+dsh plugin --profile web add github:nanhaiya/dsh-pindou-pattern
 ```
 
 本地开发时也可以直接安装目录：
