@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Bead Pattern Studio">
+  <rect width="64" height="64" rx="14" fill="#F6E7C9"/>
+  <g fill="none" stroke="#B9A886" stroke-width="1.2" opacity=".55">
+    <circle cx="32" cy="32" r="26"/>
+  </g>
+  <g fill="#C2553B">
+    <path fill-rule="evenodd" d="M18 8a10 10 0 1 0 0 20a10 10 0 1 0 0-20Zm0 6.2a3.8 3.8 0 1 1 0 7.6a3.8 3.8 0 1 1 0-7.6Z"/>
+    <path fill-rule="evenodd" d="M46 8a10 10 0 1 0 0 20a10 10 0 1 0 0-20Zm0 6.2a3.8 3.8 0 1 1 0 7.6a3.8 3.8 0 1 1 0-7.6Z"/>
+  </g>
+  <g fill="#D98A3F">
+    <path fill-rule="evenodd" d="M18 36a10 10 0 1 0 0 20a10 10 0 1 0 0-20Zm0 6.2a3.8 3.8 0 1 1 0 7.6a3.8 3.8 0 1 1 0-7.6Z"/>
+    <path fill-rule="evenodd" d="M46 36a10 10 0 1 0 0 20a10 10 0 1 0 0-20Zm0 6.2a3.8 3.8 0 1 1 0 7.6a3.8 3.8 0 1 1 0-7.6Z"/>
+  </g>
+</svg>
