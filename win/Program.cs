@@ -15,6 +15,8 @@ namespace BeadPatternStudio
     {
         private const string AppTitle = "拼豆图纸工坊 · Bead Pattern Studio";
 
+        private static Form mainForm;
+
         [DllImport("kernel32", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern bool SetDllDirectory(string path);
 
@@ -44,6 +46,7 @@ namespace BeadPatternStudio
             string page = Path.Combine(appDir, "index.html");
 
             Form form = new Form();
+            mainForm = form;
             form.Text = AppTitle;
             form.StartPosition = FormStartPosition.CenterScreen;
             form.ClientSize = new Size(1280, 840);
@@ -180,24 +183,46 @@ namespace BeadPatternStudio
 
         private static void OnDownloadStarting(object sender, CoreWebView2DownloadStartingEventArgs e)
         {
-            try
+            string name = Path.GetFileName(e.ResultFilePath);
+            if (string.IsNullOrEmpty(name) || name.IndexOf('.') < 0)
             {
-                string name = Path.GetFileName(e.ResultFilePath);
-                if (string.IsNullOrEmpty(name) || name.IndexOf('.') < 0)
+                name = "pindou-pattern.png";
+            }
+            string downloads = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Downloads");
+            Directory.CreateDirectory(downloads);
+            string extension = Path.GetExtension(name).ToLowerInvariant();
+
+            // 用系统「另存为」让用户自己挑目录
+            using (SaveFileDialog dialog = new SaveFileDialog())
+            {
+                dialog.Title = "导出图纸 / Export";
+                dialog.InitialDirectory = downloads;
+                dialog.FileName = name;
+                dialog.OverwritePrompt = true;
+                dialog.RestoreDirectory = true;
+                dialog.AddExtension = false;
+                if (extension == ".csv")
                 {
-                    name = "pindou-pattern.png";
+                    dialog.Filter = "CSV 文件 (*.csv)|*.csv|所有文件 (*.*)|*.*";
                 }
-                string downloads = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    "Downloads");
-                Directory.CreateDirectory(downloads);
-                e.ResultFilePath = UniquePath(downloads, name);
+                else
+                {
+                    dialog.Filter = "PNG 图片 (*.png)|*.png|所有文件 (*.*)|*.*";
+                }
+
+                DialogResult answer = dialog.ShowDialog(mainForm);
+                if (answer != DialogResult.OK)
+                {
+                    e.Cancel = true;
+                    e.Handled = true;
+                    return;
+                }
+                e.ResultFilePath = dialog.FileName;
+                e.Handled = true;
+                return;
             }
-            catch (Exception)
-            {
-            }
-            // Keep the standard save dialog, now pre-filled with a readable name.
-            e.Handled = false;
         }
 
         private static string UniquePath(string directory, string fileName)

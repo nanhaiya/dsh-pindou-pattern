@@ -49,7 +49,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File win\build-exe.ps1
 - 产物：`build/BeadPatternStudio.exe`，**单文件约 900 KB**，内置网页与 WebView2 SDK 程序集，不需要 Node、不需要另外安装依赖。
 - 运行要求：Windows 10/11（自带 WebView2 运行时；若缺失会提示并可用系统浏览器打开）。
 - 首次启动会把 `index.html` 解到 `%LOCALAPPDATA%\BeadPatternStudio\`（WebView2 需要真实文件路径），设置留在同目录。
-- 导出时弹出系统「另存为」，默认落在 `Downloads`；CSV 与 PNG 都是本地生成。
+- 导出时弹出系统「另存为」文件对话框，自己选目录与文件名，默认落在 `Downloads`；CSV 与 PNG 都是本地生成。
 
 ![Windows 桌面版](docs/exe-preview.png)
 

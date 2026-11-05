@@ -232,11 +232,11 @@ const CSS = `
 .pdp-legend-chip b{font-family:var(--ds-font-family-code,ui-monospace,Consolas,monospace);font-size:12.5px;font-weight:600}
 .pdp-legend-chip em{font-style:normal;font-size:11.5px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}
 .pdp-modal{position:fixed;inset:0;z-index:60;background:rgba(12,12,12,.46);display:flex;align-items:center;justify-content:center;padding:26px}
-.pdp-modal-card{display:flex;flex-direction:column;max-width:min(94vw,1080px);max-height:92vh;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.35);overflow:hidden}
+.pdp-modal-card{display:flex;flex-direction:column;width:min(94vw,920px);max-height:92vh;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.35);overflow:hidden}
 .pdp-modal-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;border-bottom:1px solid var(--dsw-alias-border-l1)}
 .pdp-modal-head h2{margin:0;font-size:12.5px;font-weight:650}
-.pdp-modal-body{flex:1;min-height:0;overflow:auto;padding:14px;background:var(--dsw-alias-bg-layer-2);display:flex;align-items:flex-start;justify-content:center}
-.pdp-modal-img{display:block;max-width:100%;max-height:calc(88vh - 160px);object-fit:contain;background:#FBF9F4;border-radius:6px;box-shadow:0 4px 24px rgba(0,0,0,.18)}
+.pdp-modal-body{flex:none;height:calc(88vh - 160px);position:relative;padding:14px;background:var(--dsw-alias-bg-layer-2)}
+.pdp-modal-img{position:absolute;inset:14px;margin:auto;display:block;width:auto;height:auto;max-width:calc(100% - 28px);max-height:calc(100% - 28px);object-fit:contain;background:#FBF9F4;border-radius:6px;box-shadow:0 4px 24px rgba(0,0,0,.18)}
 .pdp-modal-foot{flex:none;display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid var(--dsw-alias-border-l1)}
 .pdp-toast{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:70;display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;background:var(--dsw-alias-bg-overlay);border:1px solid var(--dsw-alias-border-l1);box-shadow:0 6px 24px rgba(0,0,0,.22);font-size:11.5px;color:var(--dsw-alias-label-primary);max-width:80%;animation:pdp-toast-in .18s ease-out}
 @keyframes pdp-toast-in{from{opacity:0;transform:translateX(-50%) translateY(4px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
