@@ -344,7 +344,7 @@ function makeDemoSource() {
 function fileNameFor(pat, source, extension) {
   const raw = (source && source.name ? source.name : 'pindou').replace(/\.[^.]+$/, '');
   const base = raw.replace(/[^\w\u4e00-\u9fa5-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'pindou';
-  return base + '-' + pat.w + 'x' + pat.h + '-mard.' + extension;
+  return 'pindou-' + base + '-' + pat.w + 'x' + pat.h + '-mard.' + extension;
 }
 
 function drawPattern(canvas, pattern, options) {
@@ -468,19 +468,20 @@ function renderSheet(pattern, labels, lang) {
   const numBand = Math.max(20, Math.round(cell * 0.82));
   const padX = 56;
   const padTop = 46;
-  const titleH = 108;
+  const titleH = 126;
   const gapAfterGrid = 34;
-  const legendHeadH = 48;
-  const chipW = 152;
-  const chipH = 42;
-  const footerH = 54;
+  const legendHeadH = 58;
+  const chipH = 52;
+  const footerH = 58;
   const gridW = w * cell;
   const gridH = h * cell;
   const contentW = gridW + numBand * 2;
   const sheetW = padX * 2 + contentW;
-  const perRow = Math.max(1, Math.floor(contentW / chipW));
+  // 色号清单一排最多 10 个，格子按可用宽度均分
+  const chipW = clamp(Math.floor(contentW / 10), 124, 280);
+  const perRow = Math.max(1, Math.min(10, Math.floor(contentW / chipW)));
   const rows = Math.ceil(colors.length / perRow);
-  const legendH = legendHeadH + rows * chipH + 8;
+  const legendH = legendHeadH + rows * chipH + 10;
   const sheetH = padTop + titleH + numBand + gridH + numBand + gapAfterGrid + legendH + footerH;
   const canvas = createCanvas(sheetW, sheetH);
   const g = canvas.getContext('2d');
@@ -495,15 +496,15 @@ function renderSheet(pattern, labels, lang) {
   g.textAlign = 'left';
   g.textBaseline = 'alphabetic';
   g.fillStyle = '#221F1B';
-  g.font = '700 34px ' + SANS;
-  g.fillText(labels.title, padX, padTop + 40);
+  g.font = '700 42px ' + SANS;
+  g.fillText(labels.title, padX, padTop + 48);
   g.fillStyle = '#6F675C';
-  g.font = '400 15px ' + SANS;
-  g.fillText(labels.subtitle, padX, padTop + 70);
+  g.font = '400 19px ' + SANS;
+  g.fillText(labels.subtitle, padX, padTop + 86);
   g.textAlign = 'right';
   g.fillStyle = '#B6A78E';
-  g.font = '700 20px ' + MONO;
-  g.fillText('MARD', sheetW - padX, padTop + 38);
+  g.font = '700 24px ' + MONO;
+  g.fillText('MARD', sheetW - padX, padTop + 44);
 
   const originX = padX + numBand;
   const originY = padTop + titleH + numBand;
@@ -534,7 +535,7 @@ function renderSheet(pattern, labels, lang) {
   g.lineWidth = 1.5;
   g.strokeRect(originX + 0.5, originY + 0.5, gridW - 1, gridH - 1);
 
-  const numberFont = Math.max(9, Math.round(cell * 0.36));
+  const numberFont = Math.max(10, Math.round(cell * 0.42));
   g.fillStyle = '#6E665A';
   g.font = '600 ' + numberFont + 'px ' + MONO;
   g.textAlign = 'center';
@@ -552,8 +553,8 @@ function renderSheet(pattern, labels, lang) {
 
   let maxChars = 1;
   for (const color of colors) maxChars = Math.max(maxChars, color.code.length);
-  let codeFont = Math.min(Math.round(cell * 0.46), 20);
-  codeFont = Math.min(codeFont, Math.floor((cell - 3) / (maxChars * 0.56)));
+  let codeFont = Math.min(Math.round(cell * 0.54), 26);
+  codeFont = Math.min(codeFont, Math.floor((cell - 3) / (maxChars * 0.6)));
   if (codeFont >= 5) {
     g.font = '600 ' + codeFont + 'px ' + MONO;
     g.textAlign = 'center';
@@ -573,12 +574,12 @@ function renderSheet(pattern, labels, lang) {
   g.textAlign = 'left';
   g.textBaseline = 'alphabetic';
   g.fillStyle = '#3B352D';
-  g.font = '700 21px ' + SANS;
-  g.fillText(labels.legend, padX, legendTop + 26);
+  g.font = '700 26px ' + SANS;
+  g.fillText(labels.legend, padX, legendTop + 32);
   g.textAlign = 'right';
   g.fillStyle = '#8A8174';
-  g.font = '400 15px ' + SANS;
-  g.fillText(labels.total, sheetW - padX, legendTop + 26);
+  g.font = '400 18px ' + SANS;
+  g.fillText(labels.total, sheetW - padX, legendTop + 32);
 
   const chipsTop = legendTop + legendHeadH;
   colors.forEach((color, index) => {
@@ -587,19 +588,19 @@ function renderSheet(pattern, labels, lang) {
     const x = padX + col * chipW;
     const y = chipsTop + row * chipH;
     g.fillStyle = color.hex;
-    g.fillRect(x, y + 6, 26, 26);
+    g.fillRect(x, y + 8, 32, 32);
     g.strokeStyle = 'rgba(0,0,0,0.16)';
     g.lineWidth = 1;
-    g.strokeRect(x + 0.5, y + 6.5, 25, 25);
+    g.strokeRect(x + 0.5, y + 8.5, 31, 31);
     g.textAlign = 'left';
     g.textBaseline = 'middle';
     g.fillStyle = '#2F2A24';
-    g.font = '600 17px ' + MONO;
-    g.fillText(color.code, x + 36, y + 19);
+    g.font = '600 21px ' + MONO;
+    g.fillText(color.code, x + 44, y + 24);
     const codeW = g.measureText(color.code).width;
     g.fillStyle = '#7A7266';
-    g.font = '400 14.5px ' + SANS;
-    g.fillText(formatNumber(color.count, lang), x + 36 + codeW + 9, y + 19);
+    g.font = '400 17.5px ' + SANS;
+    g.fillText(formatNumber(color.count, lang), x + 44 + codeW + 11, y + 24);
   });
 
   g.strokeStyle = '#E2DACD';
@@ -610,11 +611,11 @@ function renderSheet(pattern, labels, lang) {
   g.stroke();
   g.textAlign = 'left';
   g.fillStyle = '#8A8174';
-  g.font = '400 13px ' + SANS;
-  g.fillText(labels.footer, padX, sheetH - footerH + 30);
+  g.font = '400 15px ' + SANS;
+  g.fillText(labels.footer, padX, sheetH - footerH + 34);
   g.textAlign = 'right';
   g.fillStyle = '#A39A8B';
-  g.fillText('pindou-pattern', sheetW - padX, sheetH - footerH + 30);
+  g.fillText('pindou-pattern', sheetW - padX, sheetH - footerH + 34);
 
   return canvas;
 }
