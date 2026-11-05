@@ -67,11 +67,6 @@ dsh plugin --profile web add dsh-pindou-pattern
 dsh plugin --profile web add github:nanhaiya/dsh-pindou-pattern
 ```
 
-本地开发时也可以直接安装目录：
-
-```bash
-dsh plugin add E:\workspace\pindou   # 或在 Harness 的插件面板里安装该目录
-```
 
 安装后侧边栏「全局面板」会出现「拼豆图纸工坊」入口（排在「智能体」之后），点击即可打开工作台。
 
